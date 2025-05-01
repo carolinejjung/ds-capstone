@@ -66,6 +66,8 @@ thres_data_fmeas = data.frame(log_AIC=rep(NA,num_t), log_BIC=rep(NA,num_t),
                               prob_AIC=rep(NA,num_t), prob_BIC=rep(NA,num_t))
 thres_data_diff = data.frame(log_AIC=rep(NA,num_t), log_BIC=rep(NA,num_t),
                              prob_AIC=rep(NA,num_t), prob_BIC=rep(NA,num_t))
+thres_data_tnr = data.frame(log_AIC=rep(NA,num_t), log_BIC=rep(NA,num_t),
+                             prob_AIC=rep(NA,num_t), prob_BIC=rep(NA,num_t))
 
 # for each threshold
 for (t in 1:num_t){
@@ -74,8 +76,9 @@ for (t in 1:num_t){
 
   fold_data_fmeas = data.frame(log_AIC=rep(NA,K), log_BIC=rep(NA,K),
                                prob_AIC=rep(NA,K), prob_BIC=rep(NA,K))
-  
   fold_data_diff = data.frame(log_AIC=rep(NA,K), log_BIC=rep(NA,K),
+                              prob_AIC=rep(NA,K), prob_BIC=rep(NA,K))
+  fold_data_tnr = data.frame(log_AIC=rep(NA,K), log_BIC=rep(NA,K),
                               prob_AIC=rep(NA,K), prob_BIC=rep(NA,K))
   
   # for each fold (cv)
@@ -94,6 +97,7 @@ for (t in 1:num_t){
     models = list(logit_AIC, logit_BIC, probit_AIC, probit_BIC)
     f_meas = rep(NA,4)
     diff = rep(NA,4)
+    tnr = rep(NA, 4)
     j=1
     
     # for each model
@@ -105,34 +109,40 @@ for (t in 1:num_t){
       # check to make sure the model predicts both member & casual levels
       if (length(unique(yhat)) == 2){
         conf = table(yhat, val$member_casual)
-        sens = conf[2,2] / sum(conf[,2])
+        sens = conf[2,2] / sum(conf[,2]) # majority class
         prec = conf[2,2] / sum(conf[2,])
-        spec = conf[1,1] / sum(conf[,1])
+        spec = conf[1,1] / sum(conf[,1]) # minority class
         
         f_meas[j] = (2*sens*prec)/(sens+prec)
         diff[j] = abs(sens-spec)
+        tnr[j] = spec # true rate of minority class
         
       } else { #conf matrix is not 2x2, cannot compute metrics
         f_meas[j] = NA
         diff[j] = NA
+        tnr[j] = NA
       }
       j = j+1 # update index of model
     }
     # record the f measures & diffs for this fold
     fold_data_fmeas[f,] = f_meas
     fold_data_diff[f,] = diff
+    fold_data_tnr[f,] = tnr
   }
   # avg across folds & record for this threshold
   thres_data_fmeas[t,] = colMeans(fold_data_fmeas)
   thres_data_diff[t,] = colMeans(fold_data_diff)
+  thres_data_tnr[t,] = colMeans(fold_data_tnr)
 }
 
 thres_data_fmeas$threshold = thresholds
 thres_data_diff$threshold = thresholds
+thres_data_tnr$threshold = thresholds
 
 # performance metrics (f measure and difference) based on threshold
 thres_data_fmeas
 thres_data_diff
+thres_data_tnr
 
 # ii) best first-order model
 summary(logit_AIC)
@@ -173,6 +183,8 @@ fold_data_fmeas = data.frame(log_AIC_first=rep(NA,K), log_BIC_interact=rep(NA,K)
                        tree_bag=rep(NA,K), tree_rf=rep(NA,K), svm=rep(NA,K))
 fold_data_diff = data.frame(log_AIC_first=rep(NA,K), log_BIC_interact=rep(NA,K),
                              tree_bag=rep(NA,K), tree_rf=rep(NA,K), svm=rep(NA,K))
+fold_data_tnr = data.frame(log_AIC_first=rep(NA,K), log_BIC_interact=rep(NA,K),
+                            tree_bag=rep(NA,K), tree_rf=rep(NA,K), svm=rep(NA,K))
 
 # for each fold
 for(i in 1:K) {
@@ -203,6 +215,7 @@ for(i in 1:K) {
   models = list(logit_AIC_first, log_BIC_interact, tree_bag, tree_rf, svm_best)
   f_meas = rep(NA, 5)
   diff = rep(NA,5)
+  tnr = rep(NA, 5)
   j = 1 # index for which model we are on
   
   # for each model
@@ -231,18 +244,21 @@ for(i in 1:K) {
       
       f_meas[j] = (2*sens*prec)/(sens+prec)
       diff[j] = abs(sens-spec)
+      tnr[j] = spec
       
     } else { #conf matrix is not 2x2, cannot compute metrics
       f_meas[j] = NA
       diff[j] = NA
+      tnr[j] = NA
     }
     j = j+1
   }
   fold_data_fmeas[i,] = f_meas
   fold_data_diff[i,] = diff
+  fold_data_tnr[i,] = tnr
 }
 # avg over all folds to get f measures (col 1) & difference (col 2)
-final_summary = rbind(colMeans(fold_data_fmeas), colMeans(fold_data_diff))
+final_summary = rbind(colMeans(fold_data_fmeas), colMeans(fold_data_diff), colMeans(fold_data_tnr)) # see if we can rbind 3 dataframes
 final_summary
 
 # 5) DIAGNOSTICS -----------------------------------------------------------------
